@@ -18,6 +18,6 @@ export default defineConfig({
   // base: '/ICpEP.SE-MAPUA_Website'
   // site: 'https://Mapua-ICpEP-SE.github.io',
   site: 'https://mapua-icpep-se.pages.dev/',
-
+  output: 'static',
   adapter: cloudflare(),
 });
