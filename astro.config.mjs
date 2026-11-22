@@ -19,5 +19,7 @@ export default defineConfig({
   // site: 'https://Mapua-ICpEP-SE.github.io',
   site: 'https://mapua-icpep-se.pages.dev/',
   output: 'static',
-  adapter: cloudflare(),
+  adapter: cloudflare({
+    imageService: 'passthrough',
+  }),
 });
