@@ -1,14 +1,62 @@
 ---
-import { getCollection } from "astro:content";
+export const prerender = false;
+
+import matter from "gray-matter";
+import { env } from "cloudflare:workers";
 import FilterPageLayout from "../layouts/FilterPageLayout.astro";
 import FilterCard from "../components/FilterCard.astro";
 
-const posts = await getCollection("updates");
-const sortedPosts = posts.sort(
-    (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
-);
+// Retrieve R2 bucket directly from cloudflare:workers module
+const bucket = env.CONTENT_BUCKET;
 
-// Define the dropdown options specifically for the updates page
+let posts = [];
+
+if (bucket) {
+    const list = await bucket.list();
+
+    const postPromises = list.objects
+        .filter((obj: any) => obj.key.endsWith(".md"))
+        .map(async (obj: any) => {
+            const id = obj.key.replace(/\.md$/, "");
+            const file = await bucket.get(obj.key);
+            if (!file) return null;
+
+            const text = await file.text();
+            const { data } = matter(text);
+
+            return {
+                id,
+                data: {
+                    title: data.title || "Untitled Update",
+                    date: data.date ? new Date(data.date) : null,
+                    author: Array.isArray(data.author)
+                        ? data.author
+                        : data.author
+                          ? [data.author]
+                          : ["ICpEP Admin"],
+                    tags: Array.isArray(data.tags)
+                        ? data.tags
+                        : data.tags
+                          ? [data.tags]
+                          : [],
+                    image: data.image || null,
+                    excerpt: data.excerpt || "",
+                },
+            };
+        });
+
+    const fetchedPosts = await Promise.all(postPromises);
+    posts = fetchedPosts.filter((post: any): post is NonNullable<typeof post> => post !== null);
+} else {
+    console.warn("CONTENT_BUCKET binding is missing in Cloudflare runtime settings.");
+}
+
+const sortedPosts = posts.sort((a: any, b: any) => {
+    const timeA = a.data.date ? a.data.date.getTime() : 0;
+    const timeB = b.data.date ? b.data.date.getTime() : 0;
+    return timeB - timeA;
+});
+
 const updateFilters = [
     { label: "All Categories", value: "all" },
     { label: "Events", value: "Events" },
@@ -25,7 +73,7 @@ const updateFilters = [
     filterOptions={updateFilters}
 >
     {
-        sortedPosts.map((post) => (
+        sortedPosts.map((post: any) => (
             <FilterCard
                 title={post.data.title}
                 url={`/updates/${post.id}`}
@@ -38,11 +86,7 @@ const updateFilters = [
                           })
                         : "TBA"
                 }
-                authors={
-                    post.data.author && post.data.author.length > 0
-                        ? post.data.author
-                        : ["ICpEP Admin"]
-                }
+                authors={post.data.author}
                 tags={post.data.tags}
                 image={post.data.image}
                 excerpt={post.data.excerpt}

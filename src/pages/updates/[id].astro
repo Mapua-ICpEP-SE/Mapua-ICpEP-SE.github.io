@@ -1,26 +1,48 @@
 ---
-import { getCollection, render } from "astro:content";
+export const prerender = false;
+
+import matter from "gray-matter";
+import { marked } from "marked";
+import { env } from "cloudflare:workers";
 import Layout from "../../layouts/Layout.astro";
 import Navbar from "../../components/Navbar.astro";
 import Footer from "../../components/Footer.astro";
 
-// 1. Generate a new path for every markdown file in the collection
-export async function getStaticPaths() {
-    const posts = await getCollection("updates");
-    return posts.map((post) => ({
-        params: { id: post.id },
-        props: { post },
-    }));
+const { id } = Astro.params;
+
+if (!id) {
+    return Astro.redirect("/404");
 }
 
-// 2. Get the specific post for this page
-const { post } = Astro.props;
+// Access the R2 bucket binding from cloudflare:workers
+const bucket = env.CONTENT_BUCKET;
 
-// 3. Render the markdown content to HTML
-const { Content } = await render(post);
+if (!bucket) {
+    console.error("CONTENT_BUCKET binding is missing in Cloudflare environment settings.");
+    return Astro.redirect("/404");
+}
+
+const object = await bucket.get(`${id}.md`);
+
+if (!object) {
+    return Astro.redirect("/404");
+}
+
+const rawText = await object.text();
+const { data, content } = matter(rawText);
+const htmlContent = await marked.parse(content);
+
+const post = {
+    title: data.title || "Untitled Update",
+    tags: Array.isArray(data.tags) ? data.tags : data.tags ? [data.tags] : [],
+    author: Array.isArray(data.author) ? data.author : data.author ? [data.author] : ["ICpEP.SE Mapúa"],
+    date: data.date ? new Date(data.date) : null,
+    video: data.video || null,
+    image: data.image || null,
+};
 ---
 
-<Layout title={`${post.data.title} | ICpEP Mapua Updates`}>
+<Layout title={`${post.title} | ICpEP Mapua Updates`}>
     <Navbar />
 
     <main class="flex-grow pt-32 pb-24 px-6">
@@ -35,85 +57,72 @@ const { Content } = await render(post);
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                    ><path
+                >
+                    <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="2"
-                        d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg
-                >
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    ></path>
+                </svg>
                 Back to Updates
             </a>
 
             <!-- Post Header -->
             <header class="mb-12">
                 <div class="flex flex-wrap gap-2 mb-6">
-                    {
-                        post.data.tags.map((tag: string) => (
-                            <span class="bg-[#2d3748] text-icpep-blue text-xs px-3 py-1 font-semibold tracking-wider uppercase">
-                                {tag}
-                            </span>
-                        ))
-                    }
+                    {post.tags.map((tag: string) => (
+                        <span class="bg-[#2d3748] text-icpep-blue text-xs px-3 py-1 font-semibold tracking-wider uppercase">
+                            {tag}
+                        </span>
+                    ))}
                 </div>
 
-                <h2
-                    class="font-krona text-3xl md:text-5xl text-white leading-tight mb-6"
-                >
-                    {post.data.title}
+                <h2 class="font-krona text-3xl md:text-5xl text-white leading-tight mb-6">
+                    {post.title}
                 </h2>
 
-                <div
-                    class="flex items-center gap-4 text-sm text-gray-400 font-mono border-l-2 border-icpep-blue pl-4"
-                >
-                    <span>By {post.data.author.join(", ")}</span>
+                <div class="flex items-center gap-4 text-sm text-gray-400 font-mono border-l-2 border-icpep-blue pl-4">
+                    <span>By {post.author.join(", ")}</span>
                     <span>•</span>
-                    <span
-                        >{
-                            post.data.date
-                                ? new Date(post.data.date).toLocaleDateString(
-                                      "en-US",
-                                      {
-                                          year: "numeric",
-                                          month: "long",
-                                          day: "numeric",
-                                      },
-                                  )
-                                : "Date TBA"
-                        }</span
-                    >
+                    <span>
+                        {post.date
+                            ? post.date.toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                              })
+                            : "Date TBA"}
+                    </span>
                 </div>
             </header>
 
             <!-- Hero Media (Prioritizes Video, falls back to Image) -->
-            {
-                post.data.video ? (
-                    <div class="w-full h-[400px] md:h-[500px] rounded-xl overflow-hidden mb-16 border border-[#2d3748] bg-black">
-                        <video
-                            autoplay
-                            loop
-                            muted
-                            playsinline
-                            class="w-full h-full object-contain"
-                        >
-                            <source src={post.data.video} type="video/mp4" />
-                            Your browser does not support the video tag.
-                        </video>
-                    </div>
-                ) : post.data.image ? (
-                    <div class="w-full h-[400px] md:h-[500px] rounded-xl overflow-hidden mb-16 border border-[#2d3748]">
-                        <img
-                            src={post.data.image}
-                            alt={post.data.title}
-                            class="w-full h-full object-cover"
-                        />
-                    </div>
-                ) : null
-            }
+            {post.video ? (
+                <div class="w-full h-[400px] md:h-[500px] rounded-xl overflow-hidden mb-16 border border-[#2d3748] bg-black">
+                    <video
+                        autoplay
+                        loop
+                        muted
+                        playsinline
+                        class="w-full h-full object-contain"
+                    >
+                        <source src={post.video} type="video/mp4" />
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            ) : post.image ? (
+                <div class="w-full h-[400px] md:h-[500px] rounded-xl overflow-hidden mb-16 border border-[#2d3748]">
+                    <img
+                        src={post.image}
+                        alt={post.title}
+                        class="w-full h-full object-cover"
+                    />
+                </div>
+            ) : null}
 
-            <!-- Markdown Content Wrapper -->
-            <div class="prose-content">
-                <Content />
-            </div>
+            <!-- Render HTML converted from R2 Markdown -->
+            <div class="prose-content" set:html={htmlContent} />
         </article>
     </main>
 
@@ -121,11 +130,6 @@ const { Content } = await render(post);
 </Layout>
 
 <style is:global>
-    /* 
-    Custom styling for the injected Markdown content.
-    This ensures your markdown inherits your specific dark theme and fonts.
-  */
-    /* @reference "tailwindcss"; */
     @reference "../../styles/global.css";
 
     .prose-content {

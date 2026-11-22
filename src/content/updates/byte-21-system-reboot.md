@@ -4,8 +4,8 @@ date: 2026-10-30
 author: ["Mapúa-ICpEP.SE"]
 excerpt: "We’re rebuilding what needs rebuilding and reconnecting what matters. Get ready to power up, reconnect, and start the next chapter together."
 tags: ["News"]
-image: "/src/assets/byte21sysreboot.webp"
-video: "/src/assets/byte21sysreboot.mp4"
+image: "https://pub-631f357954d24f469e5447497518fc78.r2.dev/updates/media/byte21sysreboot.webp"
+video: "https://pub-631f357954d24f469e5447497518fc78.r2.dev/updates/media/byte21sysreboot.mp4"
 ---
 
 ICpEP.SE Mapúa has encountered a system failure.\
